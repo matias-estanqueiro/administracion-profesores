@@ -30,7 +30,15 @@ const headers = [
 </script>
 
 <template>
-    <v-data-table :headers="headers" :items="props.teachers" :items-per-page="10" class="border rounded-sm" hover>
+    <v-data-table
+        :headers="headers"
+        :items="props.teachers"
+        :items-per-page="10"
+        items-per-page-text="Filas por página"
+        no-data-text="No hay registros disponibles"
+        class="border rounded-sm"
+        hover
+    >
         <template v-slot:[`item.subjects`]="{ item }">
             <div class="d-flex flex-wrap gap-1">
                 <v-chip
