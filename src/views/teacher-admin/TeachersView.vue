@@ -1,96 +1,80 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
+import { useTeacherStore } from './stores/teacherStore';
 import TeacherForm from './components/TeacherForm.vue';
-import TeachersTable from './components/TeachersTable.vue';
+import TeacherTable from './components/TeachersTable.vue';
 import ClearStorageButton from './components/ClearStorageButton.vue';
-// Importamos la interfaz desde un archivo común. Usamos la palabra type para indicar que es solo un tipo de
-// TypeScript y no una importación real en tiempo de ejecución.
-import type { Teacher, TeacherFormModel } from './types/Teacher';
+import type { Teacher } from './types/Teacher';
 
-// Estado Reactivo (La base de datos volátil)
-const teachersList = ref<Teacher[]>([]);
+// Accedemos al store para usar sus datos y métodos
+const teacherStore = useTeacherStore();
 const teacherToEdit = ref<Teacher | null>(null);
 
-//  --------------------- LOCAL STORAGE --------------------- //
-const STORAGE_KEY = 'teachers_data';
-
 onMounted(() => {
-    const datosGuardados = localStorage.getItem(STORAGE_KEY);
-    if (datosGuardados) {
-        try {
-            teachersList.value = JSON.parse(datosGuardados);
-        } catch (error) {
-            console.error('Error al leer de LocalStorage:', error);
-            teachersList.value = [];
-        }
-    }
+    teacherStore.loadFromStorage();
 });
-
-// Observa cambios en la lista y escribe en local storage
-// { deep : true } es necesario para detectar cambios dentro de los objetos del array
-watch(
-    teachersList,
-    (nuevaLista) => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(nuevaLista));
-    },
-    { deep: true }
-);
-
-const resetApp = () => {
-    teachersList.value = [];
-};
-//  --------------------------------------------------------- //
-
-const handleSaveTeacher = (data: Teacher | TeacherFormModel) => {
-    if ('id' in data) {
-        const index = teachersList.value.findIndex((t) => t.id === data.id);
-        if (index !== -1) {
-            teachersList.value[index] = data as Teacher;
-        }
-    } else {
-        // Si no hay id, es un alta nueva
-        teachersList.value.push({
-            ...data,
-            id: Date.now()
-        });
-    }
-    teacherToEdit.value = null;
-};
-
-const deleteTeacher = (teacherId: number) => {
-    teachersList.value = teachersList.value.filter((teacher) => teacher.id !== teacherId);
-};
 
 const handleEditRequest = (teacher: Teacher) => {
     teacherToEdit.value = { ...teacher };
 };
+
+const resetEdit = () => {
+    teacherToEdit.value = null;
+};
 </script>
 
 <template>
-    <v-row>
-        <v-col cols="12">
-            <v-card elevation="2" class="pa-4 bg-primary">
-                <h2 class="text-h5 text-white">Gestión de Profesores</h2>
+    <v-row class="mb-4">
+        <v-col cols="12" md="4">
+            <v-card color="primary">
+                <v-card-text class="d-flex justify-space-between align-center">
+                    <div class="text-h5 mb-2 font-weight-medium">Total Profesores:</div>
+                    <div class="text-h4 font-weight-bold">{{ teacherStore.totalTeachers }}</div>
+                </v-card-text>
             </v-card>
         </v-col>
 
+        <v-col cols="12" md="4">
+            <v-card color="primary">
+                <v-card-text class="d-flex justify-space-between align-center">
+                    <div class="text-h5 mb-2 font-weight-medium">Documentación Entregada:</div>
+                    <div class="text-h4 font-weight-bold">{{ teacherStore.docsReadyCount }}</div>
+                </v-card-text>
+            </v-card>
+        </v-col>
+
+        <v-col cols="12" md="4">
+            <v-card color="primary">
+                <v-card-text class="d-flex justify-end align-center flex-column">
+                    <v-progress-linear :model-value="teacherStore.docsReadyPercentage" color="white" height="8" rounded></v-progress-linear>
+                    <div class="text-h4 w-100 text-right">{{ teacherStore.docsReadyPercentage }}%</div>
+                </v-card-text>
+            </v-card>
+        </v-col>
+    </v-row>
+
+    <v-row>
         <v-col cols="12">
             <v-card title="Registro de Profesor" elevation="10">
                 <template v-slot:append>
-                    <ClearStorageButton @storage-cleared="resetApp" />
+                    <ClearStorageButton @storage-cleared="teacherStore.clearAll" />
                 </template>
                 <v-card-text>
-                    <TeacherForm :editing-data="teacherToEdit" @add-teacher="handleSaveTeacher" />
+                    <TeacherForm
+                        :editing-data="teacherToEdit"
+                        @add-teacher="(data) => teacherStore.saveTeacher(data, teacherToEdit?.id)"
+                        @saved="resetEdit"
+                    />
                 </v-card-text>
             </v-card>
         </v-col>
 
         <v-col cols="12">
-            <v-card title="Listado de Profesores" elevation="10">
-                <v-card-text>
-                    <TeachersTable :teachers="teachersList" @delete-teacher="deleteTeacher" @edit-teacher="handleEditRequest" />
-                </v-card-text>
-            </v-card>
+            <TeacherTable
+                :teachers="teacherStore.teachers"
+                @delete-teacher="teacherStore.deleteTeacher"
+                @edit-teacher="handleEditRequest"
+            />
         </v-col>
     </v-row>
 </template>
